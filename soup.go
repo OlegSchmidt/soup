@@ -7,7 +7,9 @@ package soup
 import (
 	"bytes"
 	"errors"
+	"html"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -17,6 +19,7 @@ import (
 
 // Root is a structure containing a pointer to an html node, the node value, and an error variable to return an error if occurred
 type Root struct {
+	Parent    *Root
 	Pointer   *html.Node
 	NodeValue string
 	Error     error
@@ -99,7 +102,7 @@ func HTMLParse(s string) Root {
 		if debug {
 			panic("Unable to parse the HTML")
 		}
-		return Root{nil, "", errors.New("unable to parse the HTML")}
+		return Root{nil, nil, "", errors.New("unable to parse the HTML")}
 	}
 	for r.Type != html.ElementNode {
 		switch r.Type {
@@ -111,70 +114,40 @@ func HTMLParse(s string) Root {
 			r = r.NextSibling
 		}
 	}
-	return Root{r, r.Data, nil}
+	return Root{nil, r, r.Data, nil}
 }
 
 // Find finds the first occurrence of the given tag name,
 // with or without attribute key and value specified,
 // and returns a struct with a pointer to it
 func (r Root) Find(args ...string) Root {
-	temp, ok := findOnce(r.Pointer, args, false, false)
+	result, ok := findOnce(r, args, false, false)
 	if ok == false {
 		if debug {
 			panic("Element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")
 		}
-		return Root{nil, "", errors.New("element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")}
+		return Root{nil, nil, "", errors.New("element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")}
 	}
-	return Root{temp, temp.Data, nil}
-}
-
-// FindAll finds all occurrences of the given tag name,
-// with or without key and value specified,
-// and returns an array of structs, each having
-// the respective pointers
-func (r Root) FindAll(args ...string) []Root {
-	temp := findAllofem(r.Pointer, args, false)
-	if len(temp) == 0 {
-		if debug {
-			panic("Element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")
-		}
-		return []Root{}
-	}
-	pointers := make([]Root, 0, len(temp))
-	for i := 0; i < len(temp); i++ {
-		pointers = append(pointers, Root{temp[i], temp[i].Data, nil})
-	}
-	return pointers
+	return result
 }
 
 // FindStrict finds the first occurrence of the given tag name
 // only if all the values of the provided attribute are an exact match
 func (r Root) FindStrict(args ...string) Root {
-	temp, ok := findOnce(r.Pointer, args, false, true)
+	result, ok := findOnce(r, args, false, true)
 	if ok == false {
 		if debug {
 			panic("Element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")
 		}
-		return Root{nil, "", errors.New("element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")}
+		return Root{nil, nil, "", errors.New("element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")}
 	}
-	return Root{temp, temp.Data, nil}
+	return result
 }
 
 // FindAllStrict finds all occurrences of the given tag name
 // only if all the values of the provided attribute are an exact match
 func (r Root) FindAllStrict(args ...string) []Root {
-	temp := findAllofem(r.Pointer, args, true)
-	if len(temp) == 0 {
-		if debug {
-			panic("Element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")
-		}
-		return []Root{}
-	}
-	pointers := make([]Root, 0, len(temp))
-	for i := 0; i < len(temp); i++ {
-		pointers = append(pointers, Root{temp[i], temp[i].Data, nil})
-	}
-	return pointers
+	return r.findAll(args, false, true)
 }
 
 // FindNextSibling finds the next sibling of the pointer in the DOM
@@ -185,9 +158,9 @@ func (r Root) FindNextSibling() Root {
 		if debug {
 			panic("No next sibling found")
 		}
-		return Root{nil, "", errors.New("no next sibling found")}
+		return Root{nil, nil, "", errors.New("no next sibling found")}
 	}
-	return Root{nextSibling, nextSibling.Data, nil}
+	return Root{r.Parent, nextSibling, nextSibling.Data, nil}
 }
 
 // FindPrevSibling finds the previous sibling of the pointer in the DOM
@@ -198,9 +171,9 @@ func (r Root) FindPrevSibling() Root {
 		if debug {
 			panic("No previous sibling found")
 		}
-		return Root{nil, "", errors.New("no previous sibling found")}
+		return Root{nil, nil, "", errors.New("no previous sibling found")}
 	}
-	return Root{prevSibling, prevSibling.Data, nil}
+	return Root{r.Parent, prevSibling, prevSibling.Data, nil}
 }
 
 // FindNextElementSibling finds the next element sibling of the pointer in the DOM
@@ -211,12 +184,12 @@ func (r Root) FindNextElementSibling() Root {
 		if debug {
 			panic("No next element sibling found")
 		}
-		return Root{nil, "", errors.New("no next element sibling found")}
+		return Root{nil, nil, "", errors.New("no next element sibling found")}
 	}
 	if nextSibling.Type == html.ElementNode {
-		return Root{nextSibling, nextSibling.Data, nil}
+		return Root{r.Parent, nextSibling, nextSibling.Data, nil}
 	}
-	p := Root{nextSibling, nextSibling.Data, nil}
+	p := Root{r.Parent, nextSibling, nextSibling.Data, nil}
 	return p.FindNextElementSibling()
 }
 
@@ -228,12 +201,12 @@ func (r Root) FindPrevElementSibling() Root {
 		if debug {
 			panic("No previous element sibling found")
 		}
-		return Root{nil, "", errors.New("no previous element sibling found")}
+		return Root{nil, nil, "", errors.New("no previous element sibling found")}
 	}
 	if prevSibling.Type == html.ElementNode {
-		return Root{prevSibling, prevSibling.Data, nil}
+		return Root{r.Parent, prevSibling, prevSibling.Data, nil}
 	}
-	p := Root{prevSibling, prevSibling.Data, nil}
+	p := Root{r.Parent, prevSibling, prevSibling.Data, nil}
 	return p.FindPrevElementSibling()
 }
 
@@ -242,10 +215,24 @@ func (r Root) Children() []Root {
 	child := r.Pointer.FirstChild
 	var children []Root
 	for child != nil {
-		children = append(children, Root{child, child.Data, nil})
+		children = append(children, Root{&r, child, child.Data, nil})
 		child = child.NextSibling
 	}
 	return children
+}
+func (r Root) Siblings() []Root {
+	var siblings []Root
+
+	for sibling := r.Pointer.NextSibling; sibling != nil; sibling = sibling.NextSibling {
+		siblings = append(siblings, Root{r.Parent, sibling, sibling.Data, nil})
+	}
+
+	return siblings
+}
+
+// Children retuns all direct children of this DOME element.
+func (r Root) FindParent() Root {
+	return Root{r.Parent, r.Parent.Pointer, r.Parent.Pointer.Data, nil}
 }
 
 // Attrs returns a map containing all attributes
@@ -322,64 +309,91 @@ func matchElementName(n *html.Node, name string) bool {
 	return name == "" || name == n.Data
 }
 
-// Using depth first search to find the first occurrence and return
-func findOnce(n *html.Node, args []string, uni bool, strict bool) (*html.Node, bool) {
-	if uni == true {
-		if n.Type == html.ElementNode && matchElementName(n, args[0]) {
-			if len(args) > 1 && len(args) < 4 {
-				for i := 0; i < len(n.Attr); i++ {
-					attr := n.Attr[i]
-					searchAttrName := args[1]
-					searchAttrVal := args[2]
-					if (strict && attributeAndValueEquals(attr, searchAttrName, searchAttrVal)) ||
-						(!strict && attributeContainsValue(attr, searchAttrName, searchAttrVal)) {
-						return n, true
-					}
+func elementMatching(r Root, name string, strict bool, nameAttribute string, valueAttribute string) bool {
+	matching := false
+	log.Output(2, "elementMatching params")
+	log.Output(2, name)
+	log.Output(2, nameAttribute)
+	log.Output(2, valueAttribute)
+	log.Output(2, "--------------------------")
+	if r.Pointer.Type == html.ElementNode && matchElementName(r.Pointer, name) {
+		if nameAttribute == "" && valueAttribute == "" {
+			matching = true
+		} else {
+			for i := 0; i < len(r.Pointer.Attr); i++ {
+				attribute := r.Pointer.Attr[i]
+				if (strict && attributeAndValueEquals(attribute, nameAttribute, valueAttribute)) || (!strict && attributeContainsValue(attribute, nameAttribute, valueAttribute)) {
+					matching = true
+					break
 				}
-			} else if len(args) == 1 {
-				return n, true
 			}
 		}
 	}
-	uni = true
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		p, q := findOnce(c, args, true, strict)
-		if q != false {
-			return p, q
-		}
-	}
-	return nil, false
+	return matching
 }
 
-// Using depth first search to find all occurrences and return
-func findAllofem(n *html.Node, args []string, strict bool) []*html.Node {
-	var nodeLinks = make([]*html.Node, 0, 10)
-	var f func(*html.Node, []string, bool)
-	f = func(n *html.Node, args []string, uni bool) {
-		if uni == true {
-			if matchElementName(n, args[0]) {
-				if len(args) > 1 && len(args) < 4 {
-					for i := 0; i < len(n.Attr); i++ {
-						attr := n.Attr[i]
-						searchAttrName := args[1]
-						searchAttrVal := args[2]
-						if (strict && attributeAndValueEquals(attr, searchAttrName, searchAttrVal)) ||
-							(!strict && attributeContainsValue(attr, searchAttrName, searchAttrVal)) {
-							nodeLinks = append(nodeLinks, n)
-						}
-					}
-				} else if len(args) == 1 {
-					nodeLinks = append(nodeLinks, n)
-				}
-			}
+func findOnce(r Root, args []string, uni bool, strict bool) (Root, bool) {
+	var result Root
+	success := false
+	for info := range args {
+		log.Output(2, args[info])
+	}
+	if uni == true {
+		matching := false
+		switch len(args) {
+		case 1:
+			matching = elementMatching(r, args[0], true, "", "")
+			break
+		case 3:
+			matching = elementMatching(r, args[0], true, args[1], args[2])
+			break
 		}
-		uni = true
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c, args, true)
+		if matching == true {
+			result = r
+			success = true
 		}
 	}
-	f(n, args, false)
-	return nodeLinks
+	if success == false {
+		uni = true
+		children := r.Children()
+		for position := range children {
+			resultTemp, successTemp := findOnce(children[position], args, uni, strict)
+			if success == true {
+				result = resultTemp
+				success = successTemp
+				break
+			}
+		}
+	}
+	return result, success
+}
+
+func (r Root) findAll(args []string, checkSelf bool, strict bool) []Root {
+	var results []Root
+	if checkSelf == true {
+		matching := false
+		switch len(args) {
+		case 1:
+			matching = elementMatching(r, args[0], true, "", "")
+			break
+		case 3:
+			matching = elementMatching(r, args[0], true, args[1], args[2])
+			break
+		}
+		if matching == true {
+			results = append(results, r)
+		}
+	}
+
+	siblings := r.Siblings()
+	for position := range siblings {
+		siblingResult := siblings[position].findAll(args, true, strict)
+		for SiblingResultPosition := range siblingResult {
+			results = append(results, siblingResult[SiblingResultPosition])
+		}
+	}
+
+	return results
 }
 
 // attributeAndValueEquals reports when the html.Attribute attr has the same attribute name and value as from
