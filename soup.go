@@ -142,6 +142,7 @@ func (r Root) FindStrict(args ...string) Root {
 	return result
 }
 
+// find the first matching element, loogs recursively into whole HTML tree beneath the given Root struct
 func (r Root) findOnce(args []string, checkSelf bool, strict bool) (Root, bool) {
 	var result Root
 	success := false
