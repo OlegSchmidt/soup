@@ -304,7 +304,7 @@ func (r Root) Siblings() []Root {
 
 // FindParent returns the parent element
 func (r Root) FindParent() Root {
-	return Root{r.Parent, r.Parent.Pointer, r.Parent.Pointer.Data, nil}
+	return Root{r.Parent.Parent, r.Parent.Pointer, r.Parent.NodeValue, nil}
 }
 
 // checks if the HTML Node has the given attribute
