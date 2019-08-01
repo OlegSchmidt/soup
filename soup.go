@@ -7,9 +7,7 @@ package soup
 import (
 	"bytes"
 	"errors"
-	"html"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -121,7 +119,7 @@ func HTMLParse(s string) Root {
 // with or without attribute key and value specified,
 // and returns a struct with a pointer to it
 func (r Root) Find(args ...string) Root {
-	result, ok := findOnce(r, args, false, false)
+	result, ok := r.findOnce(args, false, false)
 	if ok == false {
 		if debug {
 			panic("Element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")
@@ -134,7 +132,7 @@ func (r Root) Find(args ...string) Root {
 // FindStrict finds the first occurrence of the given tag name
 // only if all the values of the provided attribute are an exact match
 func (r Root) FindStrict(args ...string) Root {
-	result, ok := findOnce(r, args, false, true)
+	result, ok := r.findOnce(args, false, true)
 	if ok == false {
 		if debug {
 			panic("Element `" + args[0] + "` with attributes `" + strings.Join(args[1:], " ") + "` not found")
@@ -144,10 +142,77 @@ func (r Root) FindStrict(args ...string) Root {
 	return result
 }
 
+func (r Root) findOnce(args []string, checkSelf bool, strict bool) (Root, bool) {
+	var result Root
+	success := false
+	if checkSelf == true {
+		matching := false
+		switch len(args) {
+		case 1:
+			matching = elementMatching(r, true, args[0], "", "")
+			break
+		case 3:
+			matching = elementMatching(r, true, args[0], args[1], args[2])
+			break
+		}
+		if matching == true {
+			result = r
+			success = true
+		}
+	}
+	if success == false {
+		checkSelf = true
+		children := r.Children()
+		for position := range children {
+			resultTemp, successTemp := children[position].findOnce(args, checkSelf, strict)
+			if successTemp == true {
+				result = resultTemp
+				success = successTemp
+				break
+			}
+		}
+	}
+	return result, success
+}
+
+// FindAllStrict finds all occurrences of the given tag name
+// only if all the values of the provided attribute are an exact match
+func (r Root) FindAll(args ...string) []Root {
+	return r.findAll(args, false, false)
+}
+
 // FindAllStrict finds all occurrences of the given tag name
 // only if all the values of the provided attribute are an exact match
 func (r Root) FindAllStrict(args ...string) []Root {
-	return r.FindAll(args, false, true)
+	return r.findAll(args, false, true)
+}
+
+func (r Root) findAll(args []string, checkSelf bool, strict bool) []Root {
+	var results []Root
+	if checkSelf == true {
+		matching := false
+		switch len(args) {
+		case 1:
+			matching = elementMatching(r, true, args[0], "", "")
+			break
+		case 3:
+			matching = elementMatching(r, true, args[0], args[1], args[2])
+			break
+		}
+		if matching == true {
+			results = append(results, r)
+		}
+	}
+
+	siblings := r.Siblings()
+	for position := range siblings {
+		siblingResult := siblings[position].findAll(args, true, strict)
+		for SiblingResultPosition := range siblingResult {
+			results = append(results, siblingResult[SiblingResultPosition])
+		}
+	}
+
+	return results
 }
 
 // FindNextSibling finds the next sibling of the pointer in the DOM
@@ -215,7 +280,9 @@ func (r Root) Children() []Root {
 	child := r.Pointer.FirstChild
 	var children []Root
 	for child != nil {
-		children = append(children, Root{&r, child, child.Data, nil})
+		if child.Type == html.ElementNode {
+			children = append(children, Root{&r, child, child.Data, nil})
+		}
 		child = child.NextSibling
 	}
 	return children
@@ -224,7 +291,9 @@ func (r Root) Siblings() []Root {
 	var siblings []Root
 
 	for sibling := r.Pointer.NextSibling; sibling != nil; sibling = sibling.NextSibling {
-		siblings = append(siblings, Root{r.Parent, sibling, sibling.Data, nil})
+		if sibling.Type == html.ElementNode {
+			siblings = append(siblings, Root{r.Parent, sibling, sibling.Data, nil})
+		}
 	}
 
 	return siblings
@@ -235,8 +304,36 @@ func (r Root) FindParent() Root {
 	return Root{r.Parent, r.Parent.Pointer, r.Parent.Pointer.Data, nil}
 }
 
+// checks if the HTML Node has the given attribute
+func (r Root) HasAttribute(attributeToFind string) bool {
+	attributes := r.Attributes()
+	found := false
+	for attributeName := range attributes {
+		if attributeName == attributeToFind {
+			found = true
+			break
+		}
+	}
+	return found
+}
+
+// checks if the HTML Node has the given attribute
+func (r Root) GetAttribute(attributeToFind string) string {
+	attribute := ""
+	if r.HasAttribute(attributeToFind) {
+		attributes := r.Attributes()
+		for attributeName := range attributes {
+			if attributeName == attributeToFind {
+				attribute = attributes[attributeName]
+			}
+		}
+	}
+
+	return attribute
+}
+
 // Attrs returns a map containing all attributes
-func (r Root) Attrs() map[string]string {
+func (r Root) Attributes() map[string]string {
 	if r.Pointer.Type != html.ElementNode {
 		if debug {
 			panic("Not an ElementNode")
@@ -305,114 +402,41 @@ func (r Root) FullText() string {
 	return buf.String()
 }
 
-func matchElementName(n *html.Node, name string) bool {
-	return name == "" || name == n.Data
-}
-
-func elementMatching(r Root, name string, strict bool, nameAttribute string, valueAttribute string) bool {
+// checks if the given root object is matching with the given filters
+func elementMatching(r Root, strict bool, name string, nameAttribute string, valueAttribute string) bool {
 	matching := false
-	log.Output(2, "elementMatching params")
-	log.Output(2, name)
-	log.Output(2, nameAttribute)
-	log.Output(2, valueAttribute)
-	log.Output(2, "--------------------------")
-	if r.Pointer.Type == html.ElementNode && matchElementName(r.Pointer, name) {
+	if r.Pointer.Type == html.ElementNode && ("" == name || r.NodeValue == name) {
 		if nameAttribute == "" && valueAttribute == "" {
 			matching = true
-		} else {
-			for i := 0; i < len(r.Pointer.Attr); i++ {
-				attribute := r.Pointer.Attr[i]
-				if (strict && attributeAndValueEquals(attribute, nameAttribute, valueAttribute)) || (!strict && attributeContainsValue(attribute, nameAttribute, valueAttribute)) {
-					matching = true
-					break
-				}
-			}
+		} else if r.HasAttribute(nameAttribute) {
+			matching = compareAttributeValues(strict, r.GetAttribute(nameAttribute), valueAttribute)
 		}
 	}
 	return matching
 }
 
-func findOnce(r Root, args []string, uni bool, strict bool) (Root, bool) {
-	var result Root
-	success := false
-	for info := range args {
-		log.Output(2, args[info])
-	}
-	if uni == true {
-		matching := false
-		switch len(args) {
-		case 1:
-			matching = elementMatching(r, args[0], true, "", "")
-			break
-		case 3:
-			matching = elementMatching(r, args[0], true, args[1], args[2])
-			break
-		}
-		if matching == true {
-			result = r
-			success = true
-		}
-	}
-	if success == false {
-		uni = true
-		children := r.Children()
-		for position := range children {
-			resultTemp, successTemp := findOnce(children[position], args, uni, strict)
-			if success == true {
-				result = resultTemp
-				success = successTemp
-				break
+// compares the string values with each other
+// should it not be wanted as script, it will check if the valueToCheck-parts are all included in valueAttribute
+func compareAttributeValues(strict bool, valueAttribute string, valueToCheck string) bool {
+	matching := false
+	if strict == true && valueAttribute == valueToCheck {
+		matching = true
+	} else if strict == false {
+		attributeParts := strings.Fields(valueAttribute)
+		searchParts := strings.Fields(valueToCheck)
+		matching = true
+		for positionSearch := range searchParts {
+			found := false
+			for positionAttribute := range attributeParts {
+				if searchParts[positionSearch] == attributeParts[positionAttribute] {
+					found = true
+					break
+				}
 			}
+			matching = matching == true && found == true
 		}
 	}
-	return result, success
-}
-
-func (r Root) FindAll(args []string, checkSelf bool, strict bool) []Root {
-	var results []Root
-	if checkSelf == true {
-		matching := false
-		switch len(args) {
-		case 1:
-			matching = elementMatching(r, args[0], true, "", "")
-			break
-		case 3:
-			matching = elementMatching(r, args[0], true, args[1], args[2])
-			break
-		}
-		if matching == true {
-			results = append(results, r)
-		}
-	}
-
-	siblings := r.Siblings()
-	for position := range siblings {
-		siblingResult := siblings[position].FindAll(args, true, strict)
-		for SiblingResultPosition := range siblingResult {
-			results = append(results, siblingResult[SiblingResultPosition])
-		}
-	}
-
-	return results
-}
-
-// attributeAndValueEquals reports when the html.Attribute attr has the same attribute name and value as from
-// provided arguments
-func attributeAndValueEquals(attr html.Attribute, attribute, value string) bool {
-	return attr.Key == attribute && attr.Val == value
-}
-
-// attributeContainsValue reports when the html.Attribute attr has the same attribute name as from provided
-// attribute argument and compares if it has the same value in its values parameter
-func attributeContainsValue(attr html.Attribute, attribute, value string) bool {
-	if attr.Key == attribute {
-		for _, attrVal := range strings.Fields(attr.Val) {
-			if attrVal == value {
-				return true
-			}
-		}
-	}
-	return false
+	return matching
 }
 
 // Returns a key pair value (like a dictionary) for each attribute

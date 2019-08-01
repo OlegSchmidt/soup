@@ -69,7 +69,7 @@ var multipleClasses = HTMLParse(multipleClassesHTML)
 
 func TestFind(t *testing.T) {
 	// Find() and Attrs()
-	actual := doc.Find("img").Attrs()["src"]
+	actual := doc.Find("img").GetAttribute("src")
 	if !reflect.DeepEqual(actual, "images/springsource.png") {
 		t.Error("Instead of `images/springsource.png`, got", actual)
 	}
@@ -122,7 +122,7 @@ func TestFindAll(t *testing.T) {
 	// FindAll() and Attrs()
 	allDivs := doc.FindAll("div")
 	for i := 0; i < len(allDivs); i++ {
-		id := allDivs[i].Attrs()["id"]
+		id := allDivs[i].Attributes()["id"]
 		actual, _ := strconv.Atoi(id)
 		if !reflect.DeepEqual(actual, i) {
 			t.Error("Instead of", i, "got", actual)
@@ -205,10 +205,10 @@ func TestFullText(t *testing.T) {
 }
 
 func TestFullTextEmpty(t *testing.T) {
-    // <div id="5"><h1><span></span></h1></div>
-    h1 := doc.Find("div", "id", "5").Find("h1")
+	// <div id="5"><h1><span></span></h1></div>
+	h1 := doc.Find("div", "id", "5").Find("h1")
 
-    if h1.FullText() != "" {
+	if h1.FullText() != "" {
 		t.Errorf("Wrong text: %s", h1.FullText())
 	}
 }
