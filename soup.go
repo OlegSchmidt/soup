@@ -147,7 +147,7 @@ func (r Root) FindStrict(args ...string) Root {
 // FindAllStrict finds all occurrences of the given tag name
 // only if all the values of the provided attribute are an exact match
 func (r Root) FindAllStrict(args ...string) []Root {
-	return r.findAll(args, false, true)
+	return r.FindAll(args, false, true)
 }
 
 // FindNextSibling finds the next sibling of the pointer in the DOM
@@ -368,7 +368,7 @@ func findOnce(r Root, args []string, uni bool, strict bool) (Root, bool) {
 	return result, success
 }
 
-func (r Root) findAll(args []string, checkSelf bool, strict bool) []Root {
+func (r Root) FindAll(args []string, checkSelf bool, strict bool) []Root {
 	var results []Root
 	if checkSelf == true {
 		matching := false
@@ -387,7 +387,7 @@ func (r Root) findAll(args []string, checkSelf bool, strict bool) []Root {
 
 	siblings := r.Siblings()
 	for position := range siblings {
-		siblingResult := siblings[position].findAll(args, true, strict)
+		siblingResult := siblings[position].FindAll(args, true, strict)
 		for SiblingResultPosition := range siblingResult {
 			results = append(results, siblingResult[SiblingResultPosition])
 		}
