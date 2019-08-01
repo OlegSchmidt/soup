@@ -149,10 +149,10 @@ func (r Root) findOnce(args []string, checkSelf bool, strict bool) (Root, bool) 
 		matching := false
 		switch len(args) {
 		case 1:
-			matching = elementMatching(r, true, args[0], "", "")
+			matching = elementMatching(r, strict, args[0], "", "")
 			break
 		case 3:
-			matching = elementMatching(r, true, args[0], args[1], args[2])
+			matching = elementMatching(r, strict, args[0], args[1], args[2])
 			break
 		}
 		if matching == true {
@@ -193,10 +193,10 @@ func (r Root) findAll(args []string, checkSelf bool, strict bool) []Root {
 		matching := false
 		switch len(args) {
 		case 1:
-			matching = elementMatching(r, true, args[0], "", "")
+			matching = elementMatching(r, strict, args[0], "", "")
 			break
 		case 3:
-			matching = elementMatching(r, true, args[0], args[1], args[2])
+			matching = elementMatching(r, strict, args[0], args[1], args[2])
 			break
 		}
 		if matching == true {
@@ -204,11 +204,11 @@ func (r Root) findAll(args []string, checkSelf bool, strict bool) []Root {
 		}
 	}
 
-	siblings := r.Siblings()
-	for position := range siblings {
-		siblingResult := siblings[position].findAll(args, true, strict)
-		for SiblingResultPosition := range siblingResult {
-			results = append(results, siblingResult[SiblingResultPosition])
+	children := r.Children()
+	for position := range children {
+		childResult := children[position].findAll(args, true, strict)
+		for childResultPosition := range childResult {
+			results = append(results, childResult[childResultPosition])
 		}
 	}
 
@@ -325,6 +325,7 @@ func (r Root) GetAttribute(attributeToFind string) string {
 		for attributeName := range attributes {
 			if attributeName == attributeToFind {
 				attribute = attributes[attributeName]
+				break
 			}
 		}
 	}
