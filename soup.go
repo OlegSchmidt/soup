@@ -288,6 +288,8 @@ func (r Root) Children() []Root {
 	}
 	return children
 }
+
+// Siblings retuns all siblings of this DOME element.
 func (r Root) Siblings() []Root {
 	var siblings []Root
 
@@ -300,7 +302,7 @@ func (r Root) Siblings() []Root {
 	return siblings
 }
 
-// Children retuns all direct children of this DOME element.
+// FindParent returns the parent element
 func (r Root) FindParent() Root {
 	return Root{r.Parent, r.Parent.Pointer, r.Parent.Pointer.Data, nil}
 }
