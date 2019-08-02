@@ -24,6 +24,7 @@ func FindNextSibling() Root {} // Pointer to the next sibling of the Element in 
 func FindNextElementSibling() Root {} // Pointer to the next element sibling of the Element in the DOM returned
 func FindPrevSibling() Root {} // Pointer to the previous sibling of the Element in the DOM returned
 func FindPrevElementSibling() Root {} // Pointer to the previous element sibling of the Element in the DOM returned
+func FindParent() Root {} // Returns the parent Node from actual element 
 func Children() []Root {} // Find all direct children of this DOM element
 func Attrs() map[string]string {} // Map returned with all the attributes of the Element as lookup to their respective values
 func Text() string {} // Full text inside a non-nested tag returned, first half returned in a non-nested one
@@ -32,6 +33,7 @@ func SetDebug(bool) {} // Sets the debug mode to true or false; false by default
 ```
 
 `Root` is a struct, containing three fields :
+* `Parent` containing the pointer to the parent of the current html node
 * `Pointer` containing the pointer to the current html node
 * `NodeValue` containing the current html node's value, i.e. the tag name for an ElementNode, or the text in case of a TextNode
 * `Error` containing an error if one occurrs, else `nil` is returned.

@@ -13,3 +13,18 @@
 - Function `FindAll()` now finds all the instances of the mentioned tag with any matching values of the provided attribute.
 
 ---
+
+## v1.2
+
+### Added
+
+- Function `HasAttribute()` checks if the element has specific attribute
+- Function `GetAttribute()` returns the value of specific attribute
+- Function `FindParent()` returns the parent of the current element
+- Function `Siblings()` returns array of Root struct
+- Function `Children()` returns array of Root struct
+
+## Changed
+
+- Internal handling with DOM elements is replaced by Root structs (working only with structs if possible)
+- Function `Attrs` renamed in `Attributes` 
