@@ -276,12 +276,13 @@ func (r Root) FindPrevElementSibling() Root {
 	return p.FindPrevElementSibling()
 }
 
-// Children retuns all direct children of this DOME element.
-func (r Root) Children() []Root {
+// Children returns all direct children of this DOME element.
+// passing true will make it possible to get all children, also the one's which are not html-nodes
+func (r Root) Children(parameters ...bool) []Root {
 	child := r.Pointer.FirstChild
 	var children []Root
 	for child != nil {
-		if child.Type == html.ElementNode {
+		if len(parameters) == 1 && parameters[0] == true || child.Type == html.ElementNode {
 			children = append(children, Root{&r, child, child.Data, nil})
 		}
 		child = child.NextSibling
@@ -289,12 +290,13 @@ func (r Root) Children() []Root {
 	return children
 }
 
-// Siblings retuns all siblings of this DOME element.
-func (r Root) Siblings() []Root {
+// Siblings returns all siblings of this DOME element.
+// passing true will make it possible to get all children, also the one's which are not html-nodes
+func (r Root) Siblings(parameters ...bool) []Root {
 	var siblings []Root
 
 	for sibling := r.Pointer.NextSibling; sibling != nil; sibling = sibling.NextSibling {
-		if sibling.Type == html.ElementNode {
+		if len(parameters) == 1 && parameters[0] == true || sibling.Type == html.ElementNode {
 			siblings = append(siblings, Root{r.Parent, sibling, sibling.Data, nil})
 		}
 	}
